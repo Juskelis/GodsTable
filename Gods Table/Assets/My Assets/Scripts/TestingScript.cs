@@ -2,6 +2,7 @@
 using System.Collections;
 using PoissonDiscGeneration;
 using System.Collections.Generic;
+using DelaunayTriangulation;
 
 public class TestingScript : MonoBehaviour
 {
@@ -16,16 +17,32 @@ public class TestingScript : MonoBehaviour
 
     private PoissonDiscGenerator gen;
     private List<Vector2> points;
+    private List<Triangle> tris;
 
 	// Use this for initialization
 	void Start ()
 	{
 	    gen = new PoissonDiscGenerator(width, height, minimumPointDistance, maximumAttempts);
 	    points = gen.BlockedGeneratePoints2D();
+	    tris = DelaunayTriangulator.Triangulate(points);
 	}
 
     void OnDrawGizmos()
     {
+        Gizmos.color = Color.white;
+        if (tris != null)
+        {
+            foreach (var tri in tris)
+            {
+                Gizmos.DrawLine(tri.Vertex1, tri.Vertex2);
+                Gizmos.DrawLine(tri.Vertex2, tri.Vertex3);
+                Gizmos.DrawLine(tri.Vertex3, tri.Vertex1);
+
+                Gizmos.DrawSphere(tri.center, 0.01f);
+            }
+        }
+
+        Gizmos.color = Color.green;
         if (points != null)
         {
             foreach (var point in points)
