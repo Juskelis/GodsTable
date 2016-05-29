@@ -87,6 +87,7 @@ namespace DelaunayTriangulation
         public Vector2 Vertex2;
         public Vector2 Vertex3;
         public Vector2 center;
+        public Vector2 circumcenter;
 
         public Triangle(Vector2 v1, Vector2 v2, Vector2 v3)
         {
@@ -95,11 +96,26 @@ namespace DelaunayTriangulation
             Vertex3 = v3;
 
             center = CalculateCenter();
+            circumcenter = CalculateCircumcenter();
         }
 
         public Vector2 CalculateCenter()
         {
-            return (Vertex1 + Vertex2 + Vertex3)/3f;
+            return (Vertex1 + Vertex2 + Vertex3) / 3f;
+        }
+
+        public Vector2 CalculateCircumcenter()
+        {
+            float a = Vertex2.x - Vertex1.x;
+            float b = Vertex2.y - Vertex1.y;
+            float c = Vertex3.x - Vertex1.x;
+            float d = Vertex3.y - Vertex1.y;
+
+            float e = a*(Vertex1.x + Vertex2.x) + b*(Vertex1.y + Vertex2.y);
+            float f = c*(Vertex1.x + Vertex3.x) + d*(Vertex1.y + Vertex3.y);
+            float g = 2.0f*(a*(Vertex3.y - Vertex2.y) - b*(Vertex3.x - Vertex2.x));
+            if(Mathf.Abs(g) < float.Epsilon) return new Vector2(Mathf.Infinity, Mathf.Infinity);
+            return new Vector2((d*e - b*f)/g, (a*f - c*e)/g);
         }
 
         // ret > 0 == inside
@@ -125,22 +141,60 @@ namespace DelaunayTriangulation
             return a_squared * det_bc + b_squared * det_ca + c_squared * det_ab;
         }
 
+        public int NumberOfSharedVertices(Triangle triangle)
+        {
+            int ret = 0;
+
+            if (Vertex1 == triangle.Vertex1) ret++;
+            if (Vertex1 == triangle.Vertex2) ret++;
+            if (Vertex1 == triangle.Vertex3) ret++;
+
+            if (Vertex2 == triangle.Vertex1) ret++;
+            if (Vertex2 == triangle.Vertex2) ret++;
+            if (Vertex2 == triangle.Vertex3) ret++;
+
+            if (Vertex3 == triangle.Vertex1) ret++;
+            if (Vertex3 == triangle.Vertex2) ret++;
+            if (Vertex3 == triangle.Vertex3) ret++;
+
+            return ret;
+        }
+
         public bool SharesVertexWith(Triangle triangle)
         {
-            if (Vertex1.x == triangle.Vertex1.x && Vertex1.y == triangle.Vertex1.y) return true;
-            if (Vertex1.x == triangle.Vertex2.x && Vertex1.y == triangle.Vertex2.y) return true;
-            if (Vertex1.x == triangle.Vertex3.x && Vertex1.y == triangle.Vertex3.y) return true;
-
-            if (Vertex2.x == triangle.Vertex1.x && Vertex2.y == triangle.Vertex1.y) return true;
-            if (Vertex2.x == triangle.Vertex2.x && Vertex2.y == triangle.Vertex2.y) return true;
-            if (Vertex2.x == triangle.Vertex3.x && Vertex2.y == triangle.Vertex3.y) return true;
-
-            if (Vertex3.x == triangle.Vertex1.x && Vertex3.y == triangle.Vertex1.y) return true;
-            if (Vertex3.x == triangle.Vertex2.x && Vertex3.y == triangle.Vertex2.y) return true;
-            if (Vertex3.x == triangle.Vertex3.x && Vertex3.y == triangle.Vertex3.y) return true;
-
-            return false;
+            return NumberOfSharedVertices(triangle) > 0;
         }
+
+        public bool SharesEdgeWidth(Triangle triangle)
+        {
+            return NumberOfSharedVertices(triangle) > 1;
+        }
+
+        #region Operators
+        public override int GetHashCode()
+        {
+            return Vertex1.GetHashCode() ^ Vertex2.GetHashCode() ^ Vertex3.GetHashCode() ^ center.GetHashCode();
+        }
+
+        public override bool Equals(object obj)
+        {
+            return this == (Triangle)obj;
+        }
+
+        public static bool operator ==(Triangle left, Triangle right)
+        {
+            if ((object)left == (object)right) return true;
+
+            if ((object)left == null || (object)right == null) return false;
+
+            return left.NumberOfSharedVertices(right) >= 3 && left.center == right.center;
+        }
+
+        public static bool operator !=(Triangle left, Triangle right)
+        {
+            return !(left == right);
+        }
+        #endregion
     }
 
     public class Edge
@@ -154,6 +208,7 @@ namespace DelaunayTriangulation
             EndPoint = end;
         }
 
+        #region Operators
         public override int GetHashCode()
         {
             return StartPoint.GetHashCode() ^ EndPoint.GetHashCode();
@@ -178,5 +233,6 @@ namespace DelaunayTriangulation
         {
             return !(left == right);
         }
+        #endregion
     }
 }
