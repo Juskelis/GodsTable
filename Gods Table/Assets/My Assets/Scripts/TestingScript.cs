@@ -25,6 +25,9 @@ public class TestingScript : MonoBehaviour
     [SerializeField]
     private int maximumAttempts = 30;
 
+    [SerializeField]
+    private TerrainGeneration terrainGenerator;
+
     private PoissonDiscGenerator gen;
     private List<Vector2> points;
     private List<Triangle> tris;
