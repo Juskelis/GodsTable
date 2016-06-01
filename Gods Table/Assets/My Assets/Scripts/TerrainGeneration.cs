@@ -13,6 +13,8 @@ public class TerrainGeneration : MonoBehaviour
     private float width;
     [SerializeField]
     private float height;
+    [SerializeField]
+    private float altitude;
 
     [SerializeField]
     private float minimumPointDistance;
@@ -148,9 +150,21 @@ public class TerrainGeneration : MonoBehaviour
         List<int> tris = new List<int>();
         for(int i = 0; i < meshTris.Count; i++)
         {
-            verts.Add(new Vector3(meshTris[i].Vertex1.x, 0, meshTris[i].Vertex1.y));
-            verts.Add(new Vector3(meshTris[i].Vertex2.x, 0, meshTris[i].Vertex2.y));
-            verts.Add(new Vector3(meshTris[i].Vertex3.x, 0, meshTris[i].Vertex3.y));
+            verts.Add(new Vector3(
+                meshTris[i].Vertex1.x,
+                HeightCalculator.GetValue(meshTris[i].Vertex1) * altitude,
+                meshTris[i].Vertex1.y
+            ));
+            verts.Add(new Vector3(
+                meshTris[i].Vertex2.x,
+                HeightCalculator.GetValue(meshTris[i].Vertex2) * altitude,
+                meshTris[i].Vertex2.y
+            ));
+            verts.Add(new Vector3(
+                meshTris[i].Vertex3.x,
+                HeightCalculator.GetValue(meshTris[i].Vertex3) * altitude,
+                meshTris[i].Vertex3.y
+            ));
 
             tris.Add(i * 3 + 2);
             tris.Add(i * 3 + 1);
