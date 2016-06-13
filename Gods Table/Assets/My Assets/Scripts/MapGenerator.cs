@@ -11,6 +11,11 @@ public class MapGenerator : MonoBehaviour
         NoiseMap, ColorMap, Mesh, FalloffMap
     }
 
+    public enum FalloffMode
+    {
+        None, Square, Circle
+    }
+
     [SerializeField] private DrawMode drawMode;
     [SerializeField] private HeightCalculator.NormalizeMode normalizeMode;
 
@@ -19,6 +24,7 @@ public class MapGenerator : MonoBehaviour
     [SerializeField]
     [Range(0, 6)]
     private int editorLevelOfDetail;
+    public int LevelOfDetail { get { return editorLevelOfDetail; } }
 
     [SerializeField]
     private float noiseScale;
@@ -30,8 +36,8 @@ public class MapGenerator : MonoBehaviour
     [SerializeField]
     private float lacunarity;
 
-    [SerializeField]
-    private int seed;
+
+    public int seed;
     [SerializeField]
     private Vector2 offset;
 
@@ -43,7 +49,7 @@ public class MapGenerator : MonoBehaviour
     [SerializeField]
     private TerrainType[] regions;
 
-    [SerializeField] private bool useFalloff = false;
+    [SerializeField] private FalloffMode falloffMode;
     private float[,] falloffMap;
 
     private Queue<MapThreadInfo<MapData>> mapDataThreadInfoQueue = new Queue<MapThreadInfo<MapData>>();
@@ -55,7 +61,10 @@ public class MapGenerator : MonoBehaviour
 
     void Awake()
     {
-        falloffMap = FalloffGenerator.GenerateFalloffMap(mapChunkSize);
+        if(falloffMode == FalloffMode.Square)
+            falloffMap = FalloffGenerator.GenerateFalloffMap(mapChunkSize);
+        else
+            falloffMap = FalloffGenerator.GenerateCircularFalloffMap(mapChunkSize);
     }
 
     public void DrawMapInEditor()
@@ -69,8 +78,13 @@ public class MapGenerator : MonoBehaviour
                 MeshGenerator.GenerateTerrainMesh(mapData.heightMap, meshHeightMultiplier, meshHeightCurve, editorLevelOfDetail),
                 TextureGenerator.TextureFromColorMap(mapData.colorMap, mapChunkSize, mapChunkSize)
             );
-        else if(drawMode == DrawMode.FalloffMap)
-            display.DrawTexture(TextureGenerator.TextureFromNoiseMap(FalloffGenerator.GenerateFalloffMap(mapChunkSize)));
+        else if (drawMode == DrawMode.FalloffMap)
+        {
+            if(falloffMode == FalloffMode.Square)
+                display.DrawTexture(TextureGenerator.TextureFromNoiseMap(FalloffGenerator.GenerateFalloffMap(mapChunkSize)));
+            else
+                display.DrawTexture(TextureGenerator.TextureFromNoiseMap(FalloffGenerator.GenerateCircularFalloffMap(mapChunkSize)));
+        }
     }
 
     public void RequestMapData(Vector2 center, Action<MapData> callback)
@@ -155,7 +169,7 @@ public class MapGenerator : MonoBehaviour
         {
             for (int x = 0; x < mapChunkSize; x++)
             {
-                if (useFalloff)
+                if (falloffMode != FalloffMode.None)
                 {
                     noiseMap[x, y] = Mathf.Clamp01(noiseMap[x, y] - falloffMap[x, y]);
                 }
@@ -179,7 +193,10 @@ public class MapGenerator : MonoBehaviour
 
     void OnValidate()
     {
-        falloffMap = FalloffGenerator.GenerateFalloffMap(mapChunkSize);
+        if(falloffMode == FalloffMode.Square)
+            falloffMap = FalloffGenerator.GenerateFalloffMap(mapChunkSize);
+        else
+            falloffMap = FalloffGenerator.GenerateCircularFalloffMap(mapChunkSize);
         if (lacunarity < 1) lacunarity = 1;
         if (ocataves < 0) ocataves = 0;
     }
