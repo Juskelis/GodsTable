@@ -3,6 +3,7 @@ using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
 using System.Threading;
+using FloodFill;
 
 public class MapGenerator : MonoBehaviour
 {
@@ -150,6 +151,7 @@ public class MapGenerator : MonoBehaviour
         }
     }
 
+    
     private MapData GenerateMapData(Vector2 center)
     {
         float[,] noiseMap = HeightCalculator.GenerateNoiseGrid(
@@ -164,6 +166,239 @@ public class MapGenerator : MonoBehaviour
             normalizeMode
         );
 
+        bool[,] waterMap = new bool[mapChunkSize,mapChunkSize];
+        bool[,] oceanMap = new bool[mapChunkSize,mapChunkSize];
+        for (int y = 0; y < mapChunkSize; y++)
+        {
+            for (int x = 0; x < mapChunkSize; x++)
+            {
+                if (falloffMode != FalloffMode.None)
+                {
+                    noiseMap[x, y] = Mathf.Clamp01(noiseMap[x, y] - falloffMap[x, y]);
+                }
+
+                waterMap[x, y] = false;
+                oceanMap[x, y] = false;
+                if (x == 0 || y == 0 || x == mapChunkSize - 2 || y == mapChunkSize - 2)
+                {
+                    waterMap[x, y] = true;
+                    oceanMap[x, y] = true;
+                }
+
+                if (noiseMap[x, y] <= regions[2].startHeight || oceanMap[x,y])
+                {
+                    waterMap[x, y] = true;
+                }
+            }
+        }
+
+        FloodFiller.Fill(ref oceanMap,waterMap);
+
+        System.Random rng = new System.Random(seed);
+        FloodFiller.Fill(ref noiseMap, waterMap, (ref float[,] grid, bool[,] spaces, int x, int y) =>
+        {
+            if (!spaces[x, y])
+            {
+                grid[x, y] = 0f;
+                if (x > 0 && x < mapChunkSize - 1 && y > 0 && y < mapChunkSize - 1)
+                {
+                    grid[x, y] = Mathf.Min(grid[x - 1, y], grid[x + 1, y], grid[x, y - 1], grid[x, y + 1]);
+                }
+                grid[x, y] += 0.01f;
+            }
+        });
+
+        for (int y = 0; y < mapChunkSize; y++)
+        {
+            for (int x = 0; x < mapChunkSize; x++)
+            {
+                waterMap[x, y] = waterMap[x,y] && !oceanMap[x,y];
+                //waterMap[x, y] = false;
+            }
+        }
+
+        //GenerateRivers(ref waterMap, ref oceanMap, ref noiseMap);
+
+        Color[] colors = new Color[mapChunkSize * mapChunkSize];
+
+        for (int y = 0; y < mapChunkSize; y++)
+        {
+            for (int x = 0; x < mapChunkSize; x++)
+            {
+
+                colors[y * mapChunkSize + x] = Color.black;
+                if (oceanMap[x, y] && !waterMap[x,y])
+                {
+                    colors[y * mapChunkSize + x] = regions[0].color;
+                }
+                else if (waterMap[x, y])
+                {
+                    colors[y*mapChunkSize + x] = regions[1].color;
+                }
+                else
+                {
+                    float currentHeight = noiseMap[x, y];
+                    for (int i = 2; i < regions.Length; i++)
+                    {
+                        if (currentHeight >= regions[i].startHeight)
+                        {
+                            colors[y * mapChunkSize + x] = regions[i].color;
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        return new MapData(noiseMap, colors);
+    }
+
+    private void findMinMax(ref float[,] heightMap, int x, int y, ref int minX, ref int minY, bool findMin = true)
+    {
+        if (x <= 0 || x >= mapChunkSize - 1) return;
+        if (y <= 0 || y >= mapChunkSize - 1) return;
+
+        float min = float.MaxValue;//heightMap[x,y];
+        if ((heightMap[x - 1, y] <= min) == findMin)
+        {
+            minX = x - 1;
+            minY = y;
+            min = heightMap[x - 1, y];
+        }
+        if ((heightMap[x + 1, y] <= min) == findMin)
+        {
+            minX = x + 1;
+            minY = y;
+            min = heightMap[x + 1, y];
+        }
+        if ((heightMap[x, y - 1] <= min) == findMin)
+        {
+            minX = x;
+            minY = y - 1;
+            min = heightMap[x, y - 1];
+        }
+        if ((heightMap[x, y + 1] <= min) == findMin)
+        {
+            minX = x;
+            minY = y + 1;
+            min = heightMap[x, y + 1];
+        }
+    }
+
+    private void GenerateRivers(ref bool[,] waterMap, ref bool[,] oceanMap, ref float[,] heightmap, int numberOfRivers = 50)
+    {
+        System.Random rng = new System.Random(seed);
+
+        int xpos = 0;
+        int ypos = 0;
+
+        for (int i = 0; i < numberOfRivers; i++)
+        {
+            xpos = rng.Next(mapChunkSize/2) + mapChunkSize/4;
+            ypos = rng.Next(mapChunkSize/2) + mapChunkSize/4;
+            
+            if (oceanMap[xpos, ypos] && waterMap[xpos,ypos])
+            {
+                i--;
+                continue;
+            }
+            
+
+            bool u = false;
+            bool l = false;
+
+            int minX = xpos;
+            int minY = ypos;
+            findMinMax(ref heightmap, xpos, ypos, ref minX, ref minY);
+
+            bool topHalf = ypos > minY;//mapChunkSize/2;
+            bool leftHalf = xpos > minX;//mapChunkSize/2;
+
+            bool v = false;
+
+            for (int j = 0; j < rng.Next(50,100); j++)
+            {
+
+                u = topHalf;
+                l = leftHalf;
+                v = true;
+
+                //choose based on lowest direction
+                if (!oceanMap[xpos, ypos] && !waterMap[xpos, ypos])
+                {
+                    if (heightmap[xpos + (l ? -1 : 1), ypos] < heightmap[xpos, ypos + (u ? -1 : 1)])
+                    {
+                        v = false;
+                    }
+
+                    /*
+                    bool highestX = false;
+                    bool highestY = false;
+
+                    if (ypos > 0 && ypos < mapChunkSize - 1)
+                    {
+                        if ((heightmap[xpos, ypos - 1] > heightmap[xpos, ypos + 1]) != u)
+                            u = !u;
+
+                        highestY = heightmap[xpos, ypos] < heightmap[xpos, ypos - 1] &&
+                                   heightmap[xpos, ypos] < heightmap[xpos, ypos + 1];
+                    }
+
+                    if (xpos > 0 && xpos < mapChunkSize - 1)
+                    {
+                        if ((heightmap[xpos - 1, ypos] > heightmap[xpos + 1, ypos]) != l)
+                            l = !l;
+
+                        highestX = heightmap[xpos, ypos] < heightmap[xpos - 1, ypos] &&
+                                   heightmap[xpos, ypos] < heightmap[xpos + 1, ypos];
+                    }
+
+                    //reduce distance if at apex
+                    if (highestX && highestY) j += Mathf.Abs((mapChunkSize - j)/4);
+                    */
+
+                }
+                else break;
+
+                waterMap[xpos, ypos] = true;
+
+                if (v)
+                {
+                    //vertical
+                    ypos += u ? 1 : -1;
+                }
+                else
+                {
+                    //horizontal
+                    xpos += l ? 1 : -1;
+                }
+
+                xpos = Mathf.Clamp(xpos, 0, mapChunkSize-1);
+                ypos = Mathf.Clamp(ypos, 0, mapChunkSize-1);
+
+            }
+        }
+    }
+    
+    /*
+    private MapData GenerateMapData(Vector2 center)
+    {
+        float[,] noiseMap = HeightCalculator.GenerateNoiseGrid(
+            mapChunkSize,
+            mapChunkSize,
+            seed,
+            noiseScale,
+            ocataves,
+            persistance,
+            lacunarity,
+            center + offset,
+            normalizeMode
+        );
+
+
         Color[] colors = new Color[mapChunkSize*mapChunkSize];
         for (int y = 0; y < mapChunkSize; y++)
         {
@@ -173,6 +408,7 @@ public class MapGenerator : MonoBehaviour
                 {
                     noiseMap[x, y] = Mathf.Clamp01(noiseMap[x, y] - falloffMap[x, y]);
                 }
+                
                 float currentHeight = noiseMap[x, y];
                 for (int i = 0; i < regions.Length; i++)
                 {
@@ -190,7 +426,7 @@ public class MapGenerator : MonoBehaviour
 
         return new MapData(noiseMap, colors);
     }
-
+    */
     void OnValidate()
     {
         if(falloffMode == FalloffMode.Square)

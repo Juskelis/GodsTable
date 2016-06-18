@@ -35,7 +35,7 @@ public static class FalloffGenerator {
                 float x = i / (float)size * 2 - 1;
                 float y = j / (float)size * 2 - 1;
 
-                map[i, j] = EvaluateCircular(Mathf.Sqrt(x*x + y*y));
+                map[i, j] = EvaluateCircular(Mathf.Sin(Mathf.Sqrt(x*x + y*y)));
             }
         }
 
@@ -52,7 +52,7 @@ public static class FalloffGenerator {
     public static float EvaluateCircular(float value)
     {
         float a = 3;
-        float b = 3f;
+        float b = 4f;
         return Mathf.Pow(value, a) / (Mathf.Pow(value, a) + Mathf.Pow(b - b * value, a));
     }
 }
