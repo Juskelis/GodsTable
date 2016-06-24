@@ -194,20 +194,6 @@ public class MapGenerator : MonoBehaviour
 
         FloodFiller.Fill(ref oceanMap,waterMap);
 
-        System.Random rng = new System.Random(seed);
-        FloodFiller.Fill(ref noiseMap, waterMap, (ref float[,] grid, bool[,] spaces, int x, int y) =>
-        {
-            if (!spaces[x, y])
-            {
-                grid[x, y] = 0f;
-                if (x > 0 && x < mapChunkSize - 1 && y > 0 && y < mapChunkSize - 1)
-                {
-                    grid[x, y] = Mathf.Min(grid[x - 1, y], grid[x + 1, y], grid[x, y - 1], grid[x, y + 1]);
-                }
-                grid[x, y] += 0.01f;
-            }
-        });
-
         for (int y = 0; y < mapChunkSize; y++)
         {
             for (int x = 0; x < mapChunkSize; x++)
@@ -217,7 +203,7 @@ public class MapGenerator : MonoBehaviour
             }
         }
 
-        //GenerateRivers(ref waterMap, ref oceanMap, ref noiseMap);
+        GenerateRivers(ref waterMap, ref oceanMap, ref noiseMap);
 
         Color[] colors = new Color[mapChunkSize * mapChunkSize];
 
@@ -233,9 +219,9 @@ public class MapGenerator : MonoBehaviour
                 }
                 else if (waterMap[x, y])
                 {
-                    colors[y*mapChunkSize + x] = regions[1].color;
+                    colors[y * mapChunkSize + x] = Color.white;// regions[1].color;
                 }
-                else
+                else if(false)
                 {
                     float currentHeight = noiseMap[x, y];
                     for (int i = 2; i < regions.Length; i++)
@@ -300,7 +286,7 @@ public class MapGenerator : MonoBehaviour
             xpos = rng.Next(mapChunkSize/2) + mapChunkSize/4;
             ypos = rng.Next(mapChunkSize/2) + mapChunkSize/4;
             
-            if (oceanMap[xpos, ypos] && waterMap[xpos,ypos])
+            if (!oceanMap[xpos, ypos] && !waterMap[xpos,ypos])
             {
                 i--;
                 continue;
@@ -326,42 +312,24 @@ public class MapGenerator : MonoBehaviour
                 l = leftHalf;
                 v = true;
 
+                minX = xpos;
+                minY = ypos;
+                findMinMax(ref heightmap, xpos, ypos, ref minX, ref minY);
+                if (minX == xpos && minY == ypos)
+                {
+                    //at the max
+                    break;
+                }
+
                 //choose based on lowest direction
                 if (!oceanMap[xpos, ypos] && !waterMap[xpos, ypos])
                 {
-                    if (heightmap[xpos + (l ? -1 : 1), ypos] < heightmap[xpos, ypos + (u ? -1 : 1)])
+                    if (heightmap[xpos + (l ? -1 : 1), ypos] > heightmap[xpos, ypos + (u ? -1 : 1)])
                     {
                         v = false;
                     }
-
-                    /*
-                    bool highestX = false;
-                    bool highestY = false;
-
-                    if (ypos > 0 && ypos < mapChunkSize - 1)
-                    {
-                        if ((heightmap[xpos, ypos - 1] > heightmap[xpos, ypos + 1]) != u)
-                            u = !u;
-
-                        highestY = heightmap[xpos, ypos] < heightmap[xpos, ypos - 1] &&
-                                   heightmap[xpos, ypos] < heightmap[xpos, ypos + 1];
-                    }
-
-                    if (xpos > 0 && xpos < mapChunkSize - 1)
-                    {
-                        if ((heightmap[xpos - 1, ypos] > heightmap[xpos + 1, ypos]) != l)
-                            l = !l;
-
-                        highestX = heightmap[xpos, ypos] < heightmap[xpos - 1, ypos] &&
-                                   heightmap[xpos, ypos] < heightmap[xpos + 1, ypos];
-                    }
-
-                    //reduce distance if at apex
-                    if (highestX && highestY) j += Mathf.Abs((mapChunkSize - j)/4);
-                    */
-
                 }
-                else break;
+                //else break;
 
                 waterMap[xpos, ypos] = true;
 
