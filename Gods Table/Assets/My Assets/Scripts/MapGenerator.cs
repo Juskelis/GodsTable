@@ -50,6 +50,9 @@ public class MapGenerator : MonoBehaviour
     [SerializeField]
     private TerrainType[] regions;
 
+    [SerializeField]
+    private int numberOfRivers = 50;
+
     [SerializeField] private FalloffMode falloffMode;
     private float[,] falloffMap;
 
@@ -174,7 +177,7 @@ public class MapGenerator : MonoBehaviour
             {
                 if (falloffMode != FalloffMode.None)
                 {
-                    noiseMap[x, y] = Mathf.Clamp01(noiseMap[x, y] - falloffMap[x, y]);
+                    noiseMap[x, y] *= (1 - falloffMap[x, y]);//Mathf.Clamp01(noiseMap[x, y] - falloffMap[x, y]);
                 }
 
                 waterMap[x, y] = false;
@@ -194,6 +197,9 @@ public class MapGenerator : MonoBehaviour
 
         FloodFiller.Fill(ref oceanMap,waterMap);
 
+        //VectorField.VectorFieldGenerator.UpdateField(ref oceanMap, ref noiseMap, seed);
+
+        // TODO: MAKE LAKES HAVE A MINIMUM SIZE
         for (int y = 0; y < mapChunkSize; y++)
         {
             for (int x = 0; x < mapChunkSize; x++)
@@ -203,7 +209,7 @@ public class MapGenerator : MonoBehaviour
             }
         }
 
-        GenerateRivers(ref waterMap, ref oceanMap, ref noiseMap);
+        bool[,] riverMap = GenerateRivers(ref waterMap, ref oceanMap, ref noiseMap, numberOfRivers);
 
         Color[] colors = new Color[mapChunkSize * mapChunkSize];
 
@@ -220,6 +226,10 @@ public class MapGenerator : MonoBehaviour
                 else if (waterMap[x, y])
                 {
                     colors[y * mapChunkSize + x] = Color.white;// regions[1].color;
+                }
+                else if(riverMap[x,y])
+                {
+                    colors[y * mapChunkSize + x] = Color.green;
                 }
                 else if(false)
                 {
@@ -274,81 +284,130 @@ public class MapGenerator : MonoBehaviour
         }
     }
 
-    private void GenerateRivers(ref bool[,] waterMap, ref bool[,] oceanMap, ref float[,] heightmap, int numberOfRivers = 50)
+    private bool[,] GenerateRivers(ref bool[,] waterMap, ref bool[,] oceanMap, ref float[,] heightmap, int riverCount = 50)
     {
         System.Random rng = new System.Random(seed);
+
+        bool[,] riverMap = new bool[mapChunkSize, mapChunkSize];
+        for(int j = 0; j < mapChunkSize; j++)
+        {
+            for(int i = 0; i < mapChunkSize; i++)
+            {
+                riverMap[i, j] = false;
+            }
+        }
 
         int xpos = 0;
         int ypos = 0;
 
-        for (int i = 0; i < numberOfRivers; i++)
+        int xdest = 0;
+        int ydest = 0;
+        int xmin = 0;
+        int ymin = 0;
+        int xmax = 0;
+        int ymax = 0;
+
+        for (int i = 0; i < riverCount; i++)
         {
             xpos = rng.Next(mapChunkSize/2) + mapChunkSize/4;
             ypos = rng.Next(mapChunkSize/2) + mapChunkSize/4;
-            
-            if (!oceanMap[xpos, ypos] && !waterMap[xpos,ypos])
+
+            if (oceanMap[xpos, ypos] || waterMap[xpos,ypos] || riverMap[xpos,ypos])
             {
                 i--;
                 continue;
             }
-            
+
+            xdest = xpos;
+            ydest = ypos;
+
+            xmin = xpos;
+            ymin = ypos;
+            xmax = xpos;
+            ymax = ypos;
+
+            while(!oceanMap[xdest,ydest] && !waterMap[xdest,ydest])
+            {
+                for(int y = ymin; y < ymax; y++)
+                {
+                    for(int x = xmin; x < xmax; x++)
+                    {
+                        if(oceanMap[x,y] || waterMap[x,y] || riverMap[xpos,ypos])
+                        {
+                            xdest = x;
+                            ydest = y;
+                            break;
+                        }
+                    }
+                }
+                xmin--;
+                ymin--;
+                xmax++;
+                ymax++;
+            }
 
             bool u = false;
             bool l = false;
 
-            int minX = xpos;
-            int minY = ypos;
-            findMinMax(ref heightmap, xpos, ypos, ref minX, ref minY);
+            int bestX = xpos;
+            int bestY = ypos;
+            float min = 0;
 
-            bool topHalf = ypos > minY;//mapChunkSize/2;
-            bool leftHalf = xpos > minX;//mapChunkSize/2;
-
-            bool v = false;
-
-            for (int j = 0; j < rng.Next(50,100); j++)
+            while((xpos != xdest || ypos != ydest) && !oceanMap[xpos,ypos] && !riverMap[xpos,ypos])
             {
+                riverMap[xpos, ypos] = true;
 
-                u = topHalf;
-                l = leftHalf;
-                v = true;
+                //find min route
+                min = heightmap[xpos, ypos];
+                bestX = xpos;
+                bestY = ypos;
 
-                minX = xpos;
-                minY = ypos;
-                findMinMax(ref heightmap, xpos, ypos, ref minX, ref minY);
-                if (minX == xpos && minY == ypos)
+                if (heightmap[xpos - 1, ypos] < min)
                 {
-                    //at the max
-                    break;
+                    bestX = xpos - 1;
+                    bestY = ypos;
+                    min = heightmap[xpos - 1, ypos];
                 }
-
-                //choose based on lowest direction
-                if (!oceanMap[xpos, ypos] && !waterMap[xpos, ypos])
+                if (heightmap[xpos + 1, ypos] < min)
                 {
-                    if (heightmap[xpos + (l ? -1 : 1), ypos] > heightmap[xpos, ypos + (u ? -1 : 1)])
+                    bestX = xpos + 1;
+                    bestY = ypos;
+                    min = heightmap[xpos + 1, ypos];
+                }
+                if (heightmap[xpos, ypos - 1] < min)
+                {
+                    bestX = xpos;
+                    bestY = ypos - 1;
+                    min = heightmap[xpos, ypos - 1];
+                }
+                if (heightmap[xpos, ypos + 1] < min)
+                {
+                    bestX = xpos;
+                    bestY = ypos + 1;
+                    min = heightmap[xpos, ypos + 1];
+                }
+                
+                if(bestX == xpos && bestY == ypos)
+                {
+                    //find direction to destination
+                    if (xpos > xdest) bestX = xpos - 1;
+                    else if (xpos < xdest) bestX = xpos + 1;
+
+                    if(bestX == xpos)
                     {
-                        v = false;
+                        if (ypos > ydest) bestY = ypos - 1;
+                        else if (ypos < ydest) bestY = ypos + 1;
                     }
-                }
-                //else break;
 
-                waterMap[xpos, ypos] = true;
-
-                if (v)
-                {
-                    //vertical
-                    ypos += u ? 1 : -1;
-                }
-                else
-                {
-                    //horizontal
-                    xpos += l ? 1 : -1;
+                    heightmap[bestX, bestY] = heightmap[xpos, ypos];
                 }
 
-                xpos = Mathf.Clamp(xpos, 0, mapChunkSize-1);
-                ypos = Mathf.Clamp(ypos, 0, mapChunkSize-1);
-
+                xpos = bestX;
+                ypos = bestY;
             }
         }
+
+        return riverMap;
     }
     
     /*

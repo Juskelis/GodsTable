@@ -52,7 +52,7 @@ public static class FalloffGenerator {
     public static float EvaluateCircular(float value)
     {
         float a = 3;
-        float b = 4f;
+        float b = 2f;
         return Mathf.Pow(value, a) / (Mathf.Pow(value, a) + Mathf.Pow(b - b * value, a));
     }
 }

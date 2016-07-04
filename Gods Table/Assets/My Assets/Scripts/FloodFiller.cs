@@ -16,15 +16,17 @@ namespace FloodFill
         //spaces sets false for all cells that cannot be filled
         //assumes square grid with outer edges filled in already
         //basically spirals inward like a snek
-        public static void Fill(ref bool[,] grid, bool[,] spaces)
+        public static void Fill(ref bool[,] grid, bool[,] spaces, bool includeDiagonals = true)
         {
             int width = grid.GetLength(0);
             int height = grid.GetLength(1);
 
-            int min_x = 0;
-            int max_x = width;
-            int min_y = 0;
-            int max_y = height;
+            int min_x = 1;
+            int max_x = width-1;
+            int min_y = 1;
+            int max_y = height-1;
+
+            bool neighbor = false;
 
             while (min_x < max_x && min_y < max_y)
             {
@@ -32,14 +34,12 @@ namespace FloodFill
                 {
                     for (int x = min_x; x < max_x; x++)
                     {
+                        neighbor = grid[x - 1, y] || grid[x, y - 1] || grid[x + 1, y] || grid[x, y + 1];
+                        if(includeDiagonals)
+                            neighbor = neighbor || grid[x - 1, y - 1] || grid[x - 1, y + 1] || grid[x + 1, y - 1] || grid[x + 1, y + 1];
+
                         //this is an eyesore and I'm so sorry
-                        if (spaces[x, y]
-                            && (
-                                (x > 0 && grid[x - 1, y]) ||
-                                (y > 0 && grid[x, y - 1]) ||
-                                (x < width && grid[x + 1, y]) ||
-                                (y < height && grid[x, y + 1]))
-                               )
+                        if (spaces[x, y] && neighbor)
                         {
                             grid[x, y] = true;
                         }
@@ -50,14 +50,12 @@ namespace FloodFill
                 {
                     for (int x = max_x-1; x >= min_x; x--)
                     {
+                        neighbor = grid[x - 1, y] || grid[x, y - 1] || grid[x + 1, y] || grid[x, y + 1];
+                        if (includeDiagonals)
+                            neighbor = neighbor || grid[x - 1, y - 1] || grid[x - 1, y + 1] || grid[x + 1, y - 1] || grid[x + 1, y + 1];
+
                         //this is an eyesore and I'm so sorry
-                        if (spaces[x, y]
-                            && (
-                                (x > 0 && grid[x - 1, y]) ||
-                                (y > 0 && grid[x, y - 1]) ||
-                                (x < width && grid[x + 1, y]) ||
-                                (y < height && grid[x, y + 1]))
-                               )
+                        if (spaces[x, y] && neighbor)
                         {
                             grid[x, y] = true;
                         }
@@ -72,6 +70,7 @@ namespace FloodFill
             }
         }
 
+        /*
         //generic version that lets me change the visit logic
         public static void Fill<G,S>(ref G[,] grid, S[,] spaces, InnerAction<G,S> visitAction)
         {
@@ -110,6 +109,7 @@ namespace FloodFill
                 max_y--;
             }
         }
+        */
 
         //generic version that's WAAAAAY slower
         public static void Fill(bool[,] grid, bool[,] spaces, Pair<int,int> start)
